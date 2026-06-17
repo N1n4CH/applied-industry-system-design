@@ -283,16 +283,24 @@ def run_agent(user_input: str, country: str) -> dict:
 
 
 # ── Lifespan (build index at startup) ────────────────────────────────────────
+import asyncio
+
+async def build_index_async():
+    try:
+        tokenizer, model, index, df, embeddings = await asyncio.to_thread(build_index)
+        state["tokenizer"] = tokenizer
+        state["model"] = model
+        state["index"] = index
+        state["df"] = df
+        state["embeddings"] = embeddings
+        logger.info("Index ready. EACIS is live.")
+    except Exception as e:
+        logger.error("Failed to build index: %s", e)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("EACIS startup — building DistilBERT + FAISS index…")
-    tokenizer, model, index, df, embeddings = build_index()
-    state["tokenizer"] = tokenizer
-    state["model"] = model
-    state["index"] = index
-    state["df"] = df
-    state["embeddings"] = embeddings
-    logger.info("Index ready. EACIS is live.")
+    logger.info("EACIS startup — launching background indexing…")
+    asyncio.create_task(build_index_async())
     yield
     state.clear()
 
